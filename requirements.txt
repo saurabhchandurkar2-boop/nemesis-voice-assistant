@@ -1,0 +1,14 @@
+faster-whisper
+sounddevice
+numpy
+edge-tts
+pygame
+ollama
+psutil
+pillow
+ultralytics
+cryptography
+python-docx
+pytesseract
+pyserial
+opencv-python

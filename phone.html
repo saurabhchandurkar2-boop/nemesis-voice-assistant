@@ -1,0 +1,581 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#05070a">
+<title>NEMESIS</title>
+<style>
+  :root { --bg:#05070a; --fg:#c9d6df; --dim:#5d6e7b; --c:200,40,40; }
+  * { box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
+  html, body { background:var(--bg); color:var(--fg); overflow-x:hidden;
+    font-family:Consolas,"Courier New",ui-monospace,monospace; }
+  body { display:flex; flex-direction:column; min-height:100vh; min-height:100dvh; padding:env(safe-area-inset-top) 16px env(safe-area-inset-bottom); }
+  header { display:flex; justify-content:space-between; align-items:center; padding:14px 0 4px; }
+  .brand { font-size:18px; letter-spacing:.4em; font-weight:700; color:#e8eef2; }
+  .brand i { display:inline-block; width:.5em; height:.5em; margin-right:.8em; background:rgb(var(--c));
+    box-shadow:0 0 12px rgb(var(--c)); animation:blink 1.6s steps(2) infinite; }
+  @keyframes blink { 50% { opacity:.25; } }
+  #link { font-size:11px; letter-spacing:.18em; color:#ff5a5a; }
+  #link.on { color:#3ddc97; }
+  #stage { flex:1; min-height:220px; position:relative; }
+  canvas { position:absolute; inset:0; width:100%; height:100%; }
+  #status { text-align:center; font-size:15px; letter-spacing:.4em; font-weight:700; color:rgb(var(--c)); min-height:22px; }
+  #heard { text-align:center; font-size:13px; color:#9fb2bf; min-height:20px; margin:4px 0 6px; }
+  #log { max-height:20vh; overflow-y:auto; display:flex; flex-direction:column; gap:3px; font-size:13px; line-height:1.4; }
+  #log div { padding:2px 8px; border-left:2px solid var(--dim); background:rgba(255,255,255,.03); }
+  #log .you { border-color:#19d3ff; color:#bff3ff; }
+  #log .nemesis { border-color:#ff4646; color:#ffd0d0; }
+  #log .sys { color:var(--dim); }
+  #log span { opacity:.6; margin-right:.6em; font-size:.8em; letter-spacing:.12em; }
+  #chips { display:flex; gap:6px; overflow-x:auto; padding:2px 0 6px; margin:2px 0; scrollbar-width:none; }
+  #chips::-webkit-scrollbar { display:none; }
+  #chips button { flex:0 0 auto; padding:7px 12px; background:#0b1117; color:#9fb2bf; border:1px solid #2a3640;
+    border-radius:16px; font:inherit; font-size:11px; letter-spacing:.12em; }
+  #chips button:active { background:rgba(var(--c), .25); color:#fff; }
+  #chips button.danger { color:#ff7a6b; border-color:#5a2a26; }
+  #lockov { display:none; position:fixed; inset:0; z-index:99; background:#05070a; align-items:center; justify-content:center;
+    flex-direction:column; text-align:center; padding:24px; color:#9fb2bf; line-height:1.7; }
+  #lockov b { font-size:22px; letter-spacing:.4em; color:#e8eef2; display:block; margin-bottom:12px; }
+  #msg { display:none; margin:8px 0; padding:10px 12px; font-size:12.5px; line-height:1.5; border:1px solid #ff9a3d;
+    color:#ffd9b0; background:rgba(255,154,61,.08); border-radius:6px; }
+  #msg code { display:block; margin:6px 0; padding:6px 8px; background:#000; color:#fff; user-select:all; word-break:break-all; }
+  .row { display:flex; gap:8px; align-items:center; margin:8px 0; }
+  .seg { display:flex; border:1px solid #2a3640; border-radius:8px; overflow:hidden; flex:1; }
+  .seg button { flex:1; padding:9px 4px; background:transparent; color:var(--dim); border:0; font:inherit; font-size:12px; letter-spacing:.1em; }
+  .seg button.on { background:rgba(var(--c), .22); color:#fff; }
+  select, input { background:#0b1117; color:var(--fg); border:1px solid #2a3640; border-radius:8px; padding:9px 10px; font:inherit; font-size:13px; }
+  input { flex:1; min-width:0; }
+  #send { padding:9px 14px; border:1px solid #2a3640; border-radius:8px; background:#0b1117; color:var(--fg); font:inherit; }
+  #talk { display:block; margin:6px auto 10px; width:92px; height:92px; border-radius:50%; border:2px solid rgb(var(--c));
+    background:radial-gradient(circle, rgba(var(--c), .35), rgba(var(--c), .06)); color:#fff; font:inherit; font-size:11px;
+    letter-spacing:.15em; box-shadow:0 0 22px rgba(var(--c), .45); }
+  #talk.active { box-shadow:0 0 36px rgba(var(--c), .9); }
+  #talk svg { display:block; margin:0 auto 4px; }
+</style>
+</head>
+<body>
+<header>
+  <div class="brand"><i></i>NEMESIS</div>
+  <div id="link">OFFLINE</div>
+</header>
+
+<div id="imgView" style="display:none;position:fixed;inset:0;z-index:50;background:rgba(0,0,0,.92);align-items:center;justify-content:center;flex-direction:column" onclick="this.style.display='none'">
+  <img style="max-width:100%;max-height:88vh;border:1px solid #2a3640"><div style="color:#9fb2bf;font-size:12px;margin-top:8px;letter-spacing:.15em">TAP TO CLOSE</div>
+</div>
+<div id="stage"><canvas id="c"></canvas><button id="stopBtn" type="button" style="position:absolute;right:8px;top:8px;background:#1a0b0b;color:#ff7a6b;border:1px solid #ff7a6b;border-radius:6px;padding:8px 14px;font:600 12px sans-serif;letter-spacing:.15em">STOP</button></div>
+<div id="status">READY</div>
+<div id="heard"></div>
+<div id="log"></div>
+<div id="msg"></div>
+<div id="chips">
+  <button data-cmd="what is the weather">WEATHER</button>
+  <button data-cmd="what is the news">NEWS</button>
+  <button data-cmd="good morning">BRIEFING</button>
+  <button data-cmd="take a screenshot and show me on my phone">SCREEN</button>
+  <button data-cmd="what do you see">LOOK</button>
+  <button data-cmd="turn on the lights">LIGHT ON</button>
+  <button data-cmd="turn off the lights">LIGHT OFF</button>
+  <button data-cmd="is the light on">LIGHT?</button>
+  <button data-cmd="freeze nemesis" class="danger">FREEZE</button>
+  <button data-cmd="unfreeze nemesis">UNFREEZE</button>
+  <button data-cmd="read this">READ</button>
+  <button data-cmd="look carefully">DETAIL</button>
+  <button data-cmd="list my reminders">REMINDERS</button>
+  <button data-cmd="run diagnostics">HEALTH</button>
+  <button data-cmd="privacy mode on">PRIVACY ON</button>
+  <button data-cmd="privacy mode off">PRIVACY OFF</button>
+  <button data-cmd="fast mode">FAST</button>
+  <button data-cmd="smart mode">SMART</button>
+  <button id="lockBtn" class="danger" type="button">LOCK ALL</button>
+</div>
+<div id="lockov"><b>LOCKED</b>This phone was logged out.<br>Scan the QR code on the PC screen again<br>(press P on the HUD page).</div>
+
+<div class="row">
+  <div class="seg"><button id="mTap" class="on">TAP TO TALK</button><button id="mFree">HANDS-FREE</button></div>
+  <select id="lang">
+    <option value="en-IN">EN-IN</option><option value="en-US">EN-US</option>
+    <option value="en-GB">EN-GB</option><option value="hi-IN">HINDI</option><option value="mr-IN">MARATHI</option>
+  </select>
+</div>
+
+<button id="talk" aria-label="Talk">
+  <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+    <rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/>
+  </svg>
+  <span id="talkLabel">TAP</span>
+</button>
+
+<div class="row">
+  <button id="eyesBtn" type="button" style="flex:1;padding:9px;border:1px solid #2a3640;border-radius:8px;background:#0b1117;color:var(--fg);font:inherit;font-size:12px;letter-spacing:.12em">EYES: OFF</button>
+  <select id="cam"><option value="environment">REAR CAM</option><option value="user">FRONT CAM</option></select>
+</div>
+<div id="eyes" style="display:none;position:relative;margin:4px 0 8px">
+  <video id="vid" muted playsinline autoplay style="width:100%;border-radius:8px;border:1px solid #2a3640;background:#000"></video>
+  <canvas id="ov" style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none"></canvas>
+  <div id="seeTxt" style="position:absolute;left:6px;bottom:4px;font-size:11px;color:#9fe;text-shadow:0 0 4px #000"></div>
+</div>
+
+<div class="row">
+  <input id="typed" type="text" placeholder="or type a command..." autocomplete="off">
+  <button id="send">SEND</button>
+</div>
+
+<script>
+(function () {
+  "use strict";
+  var params = new URLSearchParams(location.search);
+  var KEY = params.get("key") || "";
+  var SESS = params.get("s") || "";
+  var KQ = "key=" + encodeURIComponent(KEY) + "&s=" + encodeURIComponent(SESS);
+  var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+  var $ = function (id) { return document.getElementById(id); };
+  var statusEl = $("status"), heardEl = $("heard"), logEl = $("log"), msgEl = $("msg"), linkEl = $("link");
+  var talkBtn = $("talk"), talkLabel = $("talkLabel"), langSel = $("lang");
+
+  function store(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+  function load(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+
+  // ------------------------------------------------------------ states / orb
+  var STATES = {
+    idle:      { label: "READY",       col: [200, 40, 40], spin: 0.15, idle: 0.10, pulse: 1.0 },
+    listening: { label: "LISTENING",   col: [0, 205, 255], spin: 0.40, idle: 0.14, pulse: 1.6 },
+    hearing:   { label: "HEARING YOU", col: [0, 255, 190], spin: 0.90, idle: 0.20, pulse: 2.4 },
+    thinking:  { label: "PROCESSING",  col: [255, 170, 20], spin: 2.40, idle: 0.30, pulse: 4.0 },
+    speaking:  { label: "RESPONDING",  col: [255, 45, 45], spin: 1.00, idle: 0.16, pulse: 2.0 }
+  };
+  var cur = "idle";
+  var col = STATES.idle.col.slice();
+  var target = 0, lvl = 0, rot = 0, lastTs = performance.now();
+
+  function setState(s) {
+    cur = s;
+    statusEl.textContent = STATES[s].label.split("").join(" ");
+  }
+  function rgb() { return Math.round(col[0]) + "," + Math.round(col[1]) + "," + Math.round(col[2]); }
+
+  var cv = $("c"), ctx = cv.getContext("2d"), W = 0, H = 0;
+  function resize() {
+    var dpr = Math.min(2, window.devicePixelRatio || 1);
+    var r = cv.getBoundingClientRect();
+    W = r.width; H = r.height;
+    cv.width = W * dpr; cv.height = H * dpr;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  window.addEventListener("resize", resize);
+  if (window.ResizeObserver) new ResizeObserver(resize).observe($("stage"));
+  resize();
+
+  function drawOrb(t, cx, cy, R, e) {
+    var base = rgb(), g = ctx.createRadialGradient(cx, cy, 0, cx, cy, R * 2);
+    g.addColorStop(0, "rgba(" + base + "," + (0.22 + 0.38 * e) + ")");
+    g.addColorStop(1, "rgba(" + base + ",0)");
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(cx, cy, R * 2, 0, 6.2832); ctx.fill();
+    ctx.lineCap = "round";
+    var N = 64, i;
+    for (i = 0; i < N; i++) {
+      var a = (i / N) * 6.2832 + rot * 0.25;
+      var wob = Math.abs(Math.sin(i * 1.7 + t * 3.1) * Math.cos(i * 0.61 - t * 2.3));
+      var h = R * 0.07 + R * 0.5 * e * (0.25 + 0.75 * wob), r0 = R * 0.98;
+      ctx.strokeStyle = "rgba(" + base + "," + (0.35 + 0.65 * Math.min(1, e + 0.2)) + ")";
+      ctx.lineWidth = Math.max(1.5, R * 0.025);
+      ctx.beginPath();
+      ctx.moveTo(cx + Math.cos(a) * r0, cy + Math.sin(a) * r0);
+      ctx.lineTo(cx + Math.cos(a) * (r0 + h), cy + Math.sin(a) * (r0 + h));
+      ctx.stroke();
+    }
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = "rgba(" + base + ",0.75)";
+    ctx.setLineDash([R * 0.10, R * 0.06]); ctx.lineDashOffset = -rot * 60;
+    ctx.beginPath(); ctx.arc(cx, cy, R * 0.86, 0, 6.2832); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.lineWidth = Math.max(3, R * 0.05);
+    for (i = 0; i < 3; i++) {
+      var a0 = rot * 1.4 + i * 2.0944;
+      ctx.beginPath(); ctx.arc(cx, cy, R * 0.62, a0, a0 + 0.55); ctx.stroke();
+    }
+    var er = R * (0.26 + 0.2 * e);
+    g = ctx.createRadialGradient(cx, cy, 0, cx, cy, er);
+    g.addColorStop(0, "rgba(255,255,255,0.95)");
+    g.addColorStop(0.35, "rgba(" + base + ",0.95)");
+    g.addColorStop(1, "rgba(" + base + ",0)");
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(cx, cy, er, 0, 6.2832); ctx.fill();
+  }
+
+  var analyser = null, adata = null;
+  function frame(ts) {
+    var dt = Math.min(0.1, (ts - lastTs) / 1000); lastTs = ts;
+    var t = ts / 1000, S = STATES[cur], i;
+    if (cur === "speaking" && analyser) {
+      analyser.getByteTimeDomainData(adata);
+      var sum = 0;
+      for (i = 0; i < adata.length; i++) { var v = (adata[i] - 128) / 128; sum += v * v; }
+      target = Math.min(1, Math.sqrt(sum / adata.length) * 4);
+    } else if (cur === "speaking") {
+      target = 0.35 + 0.35 * Math.random();
+    } else if (cur === "hearing") {
+      target = 0.3 + 0.4 * Math.random();
+    } else {
+      target *= 0.9;
+    }
+    lvl += (target - lvl) * 0.3;
+    for (i = 0; i < 3; i++) col[i] += (S.col[i] - col[i]) * 0.08;
+    rot += S.spin * dt;
+    var e = Math.min(1, Math.max(lvl, S.idle * (0.5 + 0.5 * Math.sin(t * S.pulse))));
+    document.documentElement.style.setProperty("--c", rgb());
+    ctx.clearRect(0, 0, W, H);
+    drawOrb(t, W / 2, H / 2, Math.min(W * 0.3, H * 0.34), e);
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+
+  // ------------------------------------------------------------ messages / log
+  function addLog(who, text) {
+    var d = document.createElement("div");
+    d.className = who;
+    var tag = document.createElement("span");
+    tag.textContent = who === "you" ? "YOU" : who === "nemesis" ? "NEMESIS" : "SYS";
+    d.appendChild(tag);
+    d.appendChild(document.createTextNode(text));
+    logEl.appendChild(d);
+    while (logEl.children.length > 30) logEl.removeChild(logEl.firstChild);
+    logEl.scrollTop = logEl.scrollHeight;
+  }
+
+  function showMsg(parts) {
+    msgEl.textContent = "";
+    parts.forEach(function (p) {
+      if (p.code) {
+        var c = document.createElement("code"); c.textContent = p.code; msgEl.appendChild(c);
+      } else {
+        msgEl.appendChild(document.createTextNode(p));
+      }
+    });
+    msgEl.style.display = "block";
+  }
+  function hideMsg() { msgEl.style.display = "none"; }
+
+  function showSecureHelp() {
+    showMsg([
+      "Chrome blocks the microphone on plain http addresses. One-time fix: ",
+      "1) open a new Chrome tab and go to:", { code: "chrome://flags/#unsafely-treat-insecure-origin-as-secure" },
+      "2) switch it to Enabled and type this in the box:", { code: location.origin },
+      "3) tap Relaunch, then open this page again. (Typing a command below works meanwhile.)"
+    ]);
+  }
+
+  // ------------------------------------------------------------ audio playback
+  var player = new Audio();
+  var SILENT = "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=";
+  var unlocked = false, playing = false, awaiting = false, awaitTimer = null;
+  var queueA = [];
+  var handsFree = false, wantRec = false, recOn = false, rec = null;
+
+  function unlock() {
+    if (unlocked) return;
+    unlocked = true;
+    try { player.src = SILENT; var p = player.play(); if (p && p.catch) p.catch(function () {}); } catch (e) {}
+    try {
+      var AC = window.AudioContext || window.webkitAudioContext;
+      var ac = new AC();
+      var src = ac.createMediaElementSource(player);
+      analyser = ac.createAnalyser(); analyser.fftSize = 256;
+      adata = new Uint8Array(analyser.fftSize);
+      src.connect(analyser); analyser.connect(ac.destination);
+      if (ac.resume) ac.resume();
+    } catch (e) { analyser = null; }
+    try { if (navigator.wakeLock) navigator.wakeLock.request("screen").catch(function () {}); } catch (e) {}
+  }
+
+  function clearAwait() { awaiting = false; if (awaitTimer) { clearTimeout(awaitTimer); awaitTimer = null; } }
+  function beginAwait() {
+    awaiting = true; setState("thinking");
+    if (awaitTimer) clearTimeout(awaitTimer);
+    awaitTimer = setTimeout(function () { clearAwait(); if (!playing) afterSpeech(); }, 30000);
+  }
+
+  function pump() {
+    if (playing || !queueA.length) return;
+    var id = queueA.shift();
+    playing = true;
+    stopRec(true);
+    player.onended = player.onerror = function () {
+      playing = false;
+      if (queueA.length) pump(); else afterSpeech();
+    };
+    player.src = "/audio/" + id + "?" + KQ;
+    var p = player.play();
+    setState("speaking");
+    if (p && p.catch) p.catch(function () {
+      playing = false; queueA.unshift(id);
+      showMsg(["Tap the big mic button once to allow sound, then try again."]);
+      setState("idle");
+    });
+  }
+
+  function afterSpeech() {
+    setState("idle");
+    if (handsFree && wantRec) startRec();
+  }
+
+  // ------------------------------------------------------------ speech input
+  function send(text, direct) {
+    text = (text || "").trim();
+    if (!text) return;
+    if (direct) beginAwait();
+    fetch("/utter?" + KQ, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text: text, direct: !!direct, lang: langSel.value })
+    }).catch(function () { showMsg(["Cannot reach the PC. Is Nemesis running and are you on the same Wi-Fi?"]); clearAwait(); setState("idle"); });
+  }
+
+  function makeRec() {
+    var r = new SR();
+    r.lang = langSel.value; r.interimResults = true; r.continuous = handsFree; r.maxAlternatives = 1;
+    r.onstart = function () { try { if (navigator.vibrate) navigator.vibrate(25); } catch (e) {} recOn = true; setState("listening"); talkBtn.classList.add("active"); };
+    r.onresult = function (e) {
+      var interim = "", fin = "", i;
+      for (i = e.resultIndex; i < e.results.length; i++) {
+        var tx = e.results[i][0].transcript;
+        if (e.results[i].isFinal) fin += tx; else interim += tx;
+      }
+      if (interim) { setState("hearing"); heardEl.textContent = interim; }
+      if (fin) { heardEl.textContent = ""; send(fin, !handsFree); if (!handsFree) wantRec = false; }
+    };
+    r.onerror = function (e) {
+      if (e.error === "not-allowed" || e.error === "service-not-allowed") {
+        wantRec = false;
+        if (!window.isSecureContext) showSecureHelp();
+        else showMsg(["Microphone blocked. Tap the lock icon in Chrome's address bar, allow Microphone, and reload."]);
+      } else if (e.error === "network") {
+        if (offAvail) { offMic = true; showMsg(["No internet on the phone. Switched to offline hearing. Tap the mic again."]); }
+        else showMsg(["Speech recognition needs an internet connection on the phone. Say go offline on the PC, or type below."]);
+      } else if (e.error !== "no-speech" && e.error !== "aborted") {
+        showMsg(["Mic error: " + e.error]);
+      }
+    };
+    r.onend = function () {
+      recOn = false; talkBtn.classList.remove("active"); heardEl.textContent = "";
+      if (handsFree && wantRec && !playing && !awaiting) setTimeout(function () { if (wantRec) startRec(); }, 300);
+      else if (!playing && !awaiting) setState("idle");
+    };
+    return r;
+  }
+
+  // ---- offline hearing: record here, let the PC's own Whisper model turn it into text (no Google, no internet)
+  var offMic = false, offAvail = false, lr = null;
+  function localRecStart() {
+    if (recOn) return;
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { showMsg(["The microphone needs the one-time Chrome setting described above."]); return; }
+    recOn = true; setState("listening"); talkBtn.classList.add("active");
+    try { if (navigator.vibrate) navigator.vibrate(25); } catch (e) {}
+    navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } }).then(function (st) {
+      if (!recOn) { st.getTracks().forEach(function (t) { t.stop(); }); return; }
+      var AC = window.AudioContext || window.webkitAudioContext, ac = new AC();
+      var src = ac.createMediaStreamSource(st), proc = ac.createScriptProcessor(4096, 1, 1);
+      var chunks = [], total = 0, heard = false, quiet = 0, t0 = Date.now(), floor = 0, nfl = 0, finished = false;
+      lr = { stop: function (send) { finish(send); } };
+      function finish(send) {
+        if (finished) return; finished = true;
+        try { proc.disconnect(); src.disconnect(); } catch (e) {}
+        st.getTracks().forEach(function (t) { t.stop(); });
+        var rate = ac.sampleRate; try { ac.close(); } catch (e) {}
+        recOn = false; talkBtn.classList.remove("active"); lr = null; heardEl.textContent = "";
+        if (!send || !heard) { if (!playing && !awaiting) setState("idle"); if (handsFree && wantRec && !playing) setTimeout(function () { if (wantRec) startRec(); }, 400); return; }
+        var all = new Float32Array(total), o = 0;
+        chunks.forEach(function (c) { all.set(c, o); o += c.length; });
+        var ratio = rate / 16000, n = Math.floor(all.length / ratio), pcm = new Int16Array(n);
+        for (var i = 0; i < n; i++) {
+          var a = Math.floor(i * ratio), b = Math.min(all.length, Math.floor((i + 1) * ratio)), sum = 0, k;
+          for (k = a; k < b; k++) sum += all[k];
+          var v = b > a ? sum / (b - a) : 0;
+          pcm[i] = Math.max(-32768, Math.min(32767, Math.round(v * 32767)));
+        }
+        setState("thinking"); heardEl.textContent = "listening offline...";
+        fetch("/stt?lang=" + encodeURIComponent((langSel.value || "en").slice(0, 2)) + "&" + KQ, { method: "POST", body: pcm.buffer })
+          .then(function (r) { return r.json(); })
+          .then(function (j) {
+            heardEl.textContent = "";
+            if (j.error) { showMsg([j.error]); setState("idle"); return; }
+            if (j.text) { send_(j.text); if (!handsFree) wantRec = false; }
+            else { setState("idle"); if (handsFree && wantRec) setTimeout(function () { if (wantRec) startRec(); }, 400); }
+          }).catch(function () { heardEl.textContent = ""; showMsg(["Cannot reach the PC."]); setState("idle"); });
+      }
+      function send_(t) { send(t, !handsFree); }
+      proc.onaudioprocess = function (e) {
+        if (finished) return;
+        var d = e.inputBuffer.getChannelData(0), s = 0, i;
+        for (i = 0; i < d.length; i++) s += d[i] * d[i];
+        var rms = Math.sqrt(s / d.length), dt = d.length / ac.sampleRate, el = (Date.now() - t0) / 1000;
+        if (el < 0.5) { floor += rms; nfl++; return; }
+        var thr = Math.max(0.012, (nfl ? floor / nfl : 0) * 3);
+        chunks.push(new Float32Array(d)); total += d.length;
+        if (rms > thr) { if (!heard) setState("hearing"); heard = true; quiet = 0; } else quiet += dt;
+        if (heard && quiet > 1.1) finish(true);
+        else if (el > 20) finish(true);
+        else if (!heard && el > 8) { finish(false); }
+        else if (!heard && chunks.length > 12) { chunks.shift(); total -= 4096; }
+      };
+      src.connect(proc); proc.connect(ac.destination);
+    }).catch(function (e) {
+      recOn = false; talkBtn.classList.remove("active"); setState("idle");
+      showMsg(["Microphone blocked: " + (e && e.name) + ". Allow the microphone for this site in Chrome."]);
+    });
+  }
+
+  function startRec() {
+    if (offMic || !SR) { localRecStart(); return; }
+    if (recOn) return;
+    try { rec = makeRec(); rec.start(); } catch (e) {}
+  }
+  function stopRec(keepWant) {
+    if (!keepWant) wantRec = false;
+    try { if (rec) rec.abort(); } catch (e) {}
+    if (lr) { try { lr.stop(false); } catch (e) {} }
+    recOn = false; talkBtn.classList.remove("active");
+  }
+
+  // ------------------------------------------------------------ controls
+  function hardStop() {
+    queueA.length = 0; playing = false;
+    try { player.pause(); player.removeAttribute("src"); } catch (e) {}
+    clearAwait(); setState("idle");
+  }
+  $("stopBtn").addEventListener("click", function () {
+    hardStop();
+    fetch("/utter?" + KQ, { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ stop: true }) }).catch(function () {});
+  });
+  talkBtn.addEventListener("click", function () {
+    unlock(); hideMsg();
+    if (!window.isSecureContext) showSecureHelp();
+    if (handsFree) {
+      if (wantRec) { stopRec(); talkLabel.textContent = "START"; setState("idle"); }
+      else { wantRec = true; talkLabel.textContent = "STOP"; startRec(); }
+    } else {
+      if (recOn) { stopRec(); setState("idle"); }
+      else { wantRec = true; startRec(); }
+    }
+  });
+
+  function setMode(free) {
+    handsFree = free; wantRec = false; stopRec();
+    $("mTap").classList.toggle("on", !free); $("mFree").classList.toggle("on", free);
+    talkLabel.textContent = free ? "START" : "TAP";
+    setState("idle"); store("nemMode", free ? "free" : "tap");
+  }
+  $("mTap").addEventListener("click", function () { setMode(false); });
+  $("mFree").addEventListener("click", function () { setMode(true); });
+  langSel.addEventListener("change", function () { store("nemLang", langSel.value); });
+
+  function sendTyped() {
+    unlock();
+    var v = $("typed").value; $("typed").value = "";
+    if (v.trim()) send(v, true);
+  }
+  $("send").addEventListener("click", sendTyped);
+  document.querySelectorAll("#chips button[data-cmd]").forEach(function (b) {
+    b.addEventListener("click", function () { unlock(); send(b.getAttribute("data-cmd"), true); });
+  });
+  $("lockBtn").addEventListener("click", function () {
+    if (confirm("Log out ALL phones? You will need to scan the QR code on the PC again.")) send("lock nemesis", true);
+  });
+  function showLocked() { $("lockov").style.display = "flex"; hardStop(); try { es.close(); } catch (e) {} }
+  $("typed").addEventListener("keydown", function (e) { if (e.key === "Enter") sendTyped(); });
+
+  fetch("/state?" + KQ).then(function (r) { return r.json(); }).then(function (j) {
+    var on = j && j.info && j.info.offmic === "1"; offAvail = !!on; offMic = !!on || !SR;
+  }).catch(function () {});
+  var savedLang = load("nemLang"); if (savedLang) langSel.value = savedLang;
+  if (load("nemMode") === "free") setMode(true);
+  if (!SR) { offMic = true; }
+  else if (!window.isSecureContext) showSecureHelp();
+
+  // ------------------------------------------------------------ eyes (camera)
+  var camStream = null, camTimer = null, camOff = null, sending = false, eyesOn = false, lastDet = [];
+  var vid = $("vid"), ov = $("ov"), grab = document.createElement("canvas");
+
+  function drawDet(objs, target) {
+    lastDet = objs || [];
+    var w = ov.clientWidth, h = ov.clientHeight;
+    ov.width = w; ov.height = h;
+    var c = ov.getContext("2d");
+    c.clearRect(0, 0, w, h); c.lineWidth = 2; c.font = "12px sans-serif";
+    lastDet.forEach(function (o) {
+      var b = o.box, hot = target && o.label === target;
+      c.strokeStyle = hot ? "#ff4646" : "#19d3ff"; c.fillStyle = c.strokeStyle;
+      c.strokeRect(b[0] * w, b[1] * h, (b[2] - b[0]) * w, (b[3] - b[1]) * h);
+      c.fillText("#" + o.id + " " + o.label + " " + Math.round(o.conf * 100) + "%", b[0] * w + 3, Math.max(12, b[1] * h - 4));
+    });
+  }
+
+  function sendFrame() {
+    if (!eyesOn || sending || !vid.videoWidth) return;
+    var scale = 320 / vid.videoWidth;
+    grab.width = 320; grab.height = Math.round(vid.videoHeight * scale);
+    grab.getContext("2d").drawImage(vid, 0, 0, grab.width, grab.height);
+    sending = true;
+    grab.toBlob(function (blob) {
+      if (!blob) { sending = false; return; }
+      fetch("/frame?" + KQ, { method: "POST", body: blob }).catch(function () {}).then(function () { sending = false; });
+    }, "image/jpeg", 0.6);
+  }
+
+  function sendStill() {
+    if (!eyesOn || !vid.videoWidth) return;
+    var w = Math.min(1600, vid.videoWidth), sc = w / vid.videoWidth, c = document.createElement("canvas");
+    c.width = w; c.height = Math.round(vid.videoHeight * sc);
+    c.getContext("2d").drawImage(vid, 0, 0, c.width, c.height);
+    c.toBlob(function (blob) {
+      if (blob) fetch("/frame?hires=1&" + KQ, { method: "POST", body: blob }).catch(function () {});
+    }, "image/jpeg", 0.92);
+  }
+
+  function eyesStart() {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      showMsg(["Camera needs the same one-time Chrome setting as the microphone (see above), then reload this page."]);
+      return;
+    }
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: $("cam").value }, width: { ideal: 1920 }, height: { ideal: 1080 } }, audio: false }).then(function (st) {
+      camStream = st; vid.srcObject = st; eyesOn = true;
+      $("eyes").style.display = "block"; $("eyesBtn").textContent = "EYES: ON";
+      camTimer = setInterval(sendFrame, 600);
+      camOff = setTimeout(function () { if (eyesOn) { eyesStop(); showMsg(["Camera switched off automatically after 10 minutes. Tap EYES to turn it on again."]); } }, 600000);
+    }).catch(function (e) { showMsg(["Camera blocked: " + (e && e.name) + ". Allow the camera for this site in Chrome."]); });
+  }
+  function eyesStop() {
+    eyesOn = false; clearInterval(camTimer); clearTimeout(camOff);
+    if (camStream) camStream.getTracks().forEach(function (t) { t.stop(); });
+    camStream = null; $("eyes").style.display = "none"; $("eyesBtn").textContent = "EYES: OFF"; drawDet([], null);
+  }
+  $("eyesBtn").addEventListener("click", function () { unlock(); if (eyesOn) eyesStop(); else eyesStart(); });
+  $("cam").addEventListener("change", function () { if (eyesOn) { eyesStop(); eyesStart(); } });
+
+  // ------------------------------------------------------------ live link
+  function setLink(on) { linkEl.textContent = on ? "ONLINE" : "OFFLINE"; linkEl.className = on ? "on" : ""; }
+  var es = new EventSource("/events?phone=1&" + KQ);
+  es.onopen = function () { setLink(true); };
+  es.onerror = function () {
+    setLink(false);
+    fetch("/auth-check?s=" + encodeURIComponent(SESS)).then(function (r) { if (r.status === 403) showLocked(); }).catch(function () {});
+  };
+  es.onmessage = function (ev) {
+    var m; try { m = JSON.parse(ev.data); } catch (e) { return; }
+    if (m.t === "log") addLog(m.who, m.text);
+    else if (m.t === "stop") hardStop();
+    else if (m.t === "lock") setTimeout(showLocked, 1500);
+    else if (m.t === "image") { var iv = $("imgView"); iv.querySelector("img").src = "/audio/" + m.id + "?" + KQ; iv.style.display = "flex"; }
+    else if (m.t === "snap") sendStill();
+    else if (m.t === "mode") { offMic = offAvail = !!m.offline; showMsg([m.offline ? "Offline hearing is on. Speak after tapping the mic." : "Online hearing is on."]); setTimeout(hideMsg, 3500); }
+    else if (m.t === "eyes") { if (m.on && !eyesOn) eyesStart(); else if (!m.on && eyesOn) eyesStop(); }
+    else if (m.t === "det") { drawDet(m.objs, m.target); $("seeTxt").textContent = (m.target ? "TRACKING " + m.target.toUpperCase() + "  " : "") + (m.objs || []).length + " OBJECTS"; }
+    else if (m.t === "audio") { clearAwait(); queueA.push(m.id); pump(); }
+    else if (m.t === "state" && m.v === "thinking" && !awaiting && !playing) beginAwait();
+  };
+})();
+</script>
+</body>
+</html>

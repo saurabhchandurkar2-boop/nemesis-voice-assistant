@@ -1,0 +1,569 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>NEMESIS</title>
+<style>
+  :root { --bg:#05070a; --fg:#c9d6df; --dim:#5d6e7b; --c:200,40,40; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  html, body { height:100%; background:var(--bg); color:var(--fg); overflow:hidden;
+    font-family:Consolas,"Courier New",ui-monospace,monospace; }
+  canvas { position:fixed; inset:0; display:block; }
+  .scan { position:fixed; inset:0; pointer-events:none;
+    background:repeating-linear-gradient(0deg, rgba(255,255,255,.03) 0 1px, transparent 1px 3px); }
+  .vig { position:fixed; inset:0; pointer-events:none;
+    background:radial-gradient(ellipse at center, transparent 50%, rgba(0,0,0,.8) 100%); }
+  .sweep { position:fixed; left:0; right:0; height:140px; pointer-events:none;
+    background:linear-gradient(transparent, rgba(var(--c), .07), transparent);
+    animation:sweep 7s linear infinite; }
+  @keyframes sweep { from { top:-140px; } to { top:100%; } }
+
+  .corner { position:fixed; width:34px; height:34px; border:2px solid rgba(var(--c), .55); pointer-events:none; }
+  .tl { top:12px; left:12px; border-right:0; border-bottom:0; }
+  .tr { top:12px; right:12px; border-left:0; border-bottom:0; }
+  .bl { bottom:12px; left:12px; border-right:0; border-top:0; }
+  .br { bottom:12px; right:12px; border-left:0; border-top:0; }
+
+  header { position:fixed; top:0; left:0; right:0; display:flex; justify-content:space-between;
+    align-items:flex-start; padding:24px 32px; pointer-events:none; }
+  .brand { font-size:clamp(18px, 3vw, 28px); letter-spacing:.45em; font-weight:700; color:#e8eef2; }
+  .brand i { display:inline-block; width:.55em; height:.55em; margin-right:.9em; background:rgb(var(--c));
+    box-shadow:0 0 14px rgb(var(--c)); animation:blink 1.6s steps(2) infinite; }
+  @keyframes blink { 50% { opacity:.25; } }
+  .sub { margin-top:6px; font-size:11px; letter-spacing:.3em; color:var(--dim); }
+  .right { text-align:right; font-size:12px; letter-spacing:.2em; color:var(--dim); }
+  .right b { display:block; font-size:clamp(16px, 2.4vw, 22px); color:#e8eef2; font-weight:400; letter-spacing:.15em; }
+  #link.on { color:#3ddc97; }
+  #link.off { color:#ff5a5a; }
+
+  #log { position:fixed; left:32px; bottom:28px; width:min(760px, calc(100vw - 330px));
+    display:flex; flex-direction:column; gap:4px; font-size:clamp(12px, 1.5vw, 15px); line-height:1.45;
+    pointer-events:none; }
+  #log div { padding:3px 10px; border-left:2px solid var(--dim); background:rgba(5,7,10,.55);
+    animation:in .25s ease-out; }
+  #log .you { border-color:#19d3ff; color:#bff3ff; }
+  #log .nemesis { border-color:rgb(255,70,70); color:#ffd0d0; }
+  #log .sys { border-color:var(--dim); color:var(--dim); }
+  #log span { opacity:.6; margin-right:.8em; letter-spacing:.15em; font-size:.85em; }
+  @keyframes in { from { opacity:0; transform:translateX(-8px); } to { opacity:1; transform:none; } }
+
+  #lightctl { position:fixed; left:36px; top:124px; display:flex; gap:8px; align-items:center; font-size:11px; letter-spacing:.14em; color:var(--dim); }
+  #lightctl button { font:inherit; letter-spacing:.14em; background:rgba(0,0,0,.45); color:var(--fg); border:1px solid rgba(var(--c),.55); padding:6px 14px; cursor:pointer; }
+  #lightctl button:hover { background:rgba(var(--c),.22); }
+  #lightctl.on #lightstate { color:#ffb020; }
+  @media (max-width: 800px) { #lightctl { left:16px; top:172px; } }
+  #panel { position:fixed; right:28px; bottom:28px; width:230px; font-size:11px; letter-spacing:.12em;
+    color:var(--dim); pointer-events:none; display:flex; flex-direction:column; gap:12px; }
+  .grp { border-left:2px solid rgba(var(--c), .55); padding:2px 0 2px 10px; background:linear-gradient(90deg, rgba(5,7,10,.7), transparent); }
+  .grp h4 { font-size:10px; font-weight:400; letter-spacing:.3em; color:rgb(var(--c)); margin-bottom:4px; opacity:.9; }
+  .row2 { display:flex; justify-content:space-between; gap:8px; line-height:1.75; }
+  .row2 b { color:#9fb2bf; font-weight:400; text-align:right; max-width:140px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .row2 b.ok { color:#3ddc97; } .row2 b.warn { color:#ffb347; } .row2 b.bad { color:#ff5a5a; }
+  .bar { height:4px; background:rgba(255,255,255,.08); margin:1px 0 5px; }
+  .bar i { display:block; height:100%; width:0; background:#3ddc97; transition:width .6s, background .6s; }
+  .bar i.warn { background:#ffb347; } .bar i.bad { background:#ff5a5a; }
+  #alerts { position:fixed; top:84px; left:calc((100vw - 260px) / 2); transform:translateX(-50%); display:flex; gap:8px; flex-wrap:wrap;
+    justify-content:center; pointer-events:none; max-width:calc(100vw - 300px); }
+  .chip { font-size:10px; letter-spacing:.22em; padding:4px 10px; border:1px solid currentColor; border-radius:3px;
+    background:rgba(5,7,10,.75); animation:in .3s ease-out; }
+  .chip.ok { color:#3ddc97; } .chip.warn { color:#ffb347; } .chip.bad { color:#ff5a5a; animation:blink 1s steps(2) infinite; }
+  #heard { position:fixed; top:118px; left:50%; transform:translateX(-50%); max-width:60vw; font-size:clamp(13px,1.6vw,17px);
+    color:#bff3ff; letter-spacing:.04em; text-align:center; opacity:0; transition:opacity .5s; pointer-events:none;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  #heard.on { opacity:.95; }
+  #phonebox { position:fixed; right:28px; top:96px; width:230px; text-align:center; font-size:10px;
+    letter-spacing:.15em; color:var(--dim); display:none; padding:10px; background:rgba(5,7,10,.88);
+    border:1px solid rgba(var(--c), .5); }
+  #phonebox #qr { width:200px; height:200px; margin:0 auto 8px; padding:6px; background:#05070a; cursor:zoom-in;
+    border:1px solid rgba(var(--c), .5); }
+  #phonebox #qr.big { position:fixed; left:50%; top:50%; transform:translate(-50%,-50%); width:min(86vh,86vw); height:min(86vh,86vw);
+    padding:10px; background:#fff; z-index:50; cursor:zoom-out; box-shadow:0 0 0 100vmax rgba(0,0,0,.8); }
+  #phonebox #qr img, #phonebox #qr canvas { width:100% !important; height:100% !important; }
+  #phonebox #purl { word-break:break-all; letter-spacing:.02em; font-size:10px; color:#9fb2bf; margin-top:4px; }
+  #phonebox small { display:block; margin-top:6px; color:#ffb347; letter-spacing:.1em; }
+  @media (max-width:760px) { #phonebox { display:none !important; } }
+  #viewbtn { position:fixed; right:28px; bottom:4px; z-index:20; font:inherit; font-size:10px; letter-spacing:.22em; background:rgba(0,0,0,.5);
+    color:var(--dim); border:1px solid rgba(var(--c),.4); padding:3px 10px; cursor:pointer; opacity:.6; }
+  #viewbtn:hover { opacity:1; color:var(--fg); }
+  body.view1 #panel { display:none; }
+  body.view1 #log { width:min(760px, calc(100vw - 64px)); }
+  body.view1 #alerts, body.view2 #alerts { left:50%; max-width:70vw; }
+  body.view2 #panel, body.view2 #log, body.view2 #alerts, body.view2 #lightctl, body.view2 .hint { display:none; }
+  @media (max-height:720px) { #panel { gap:7px; font-size:10px; } .row2 { line-height:1.45; } .grp h4 { margin-bottom:2px; } .bar { margin:0 0 3px; } }
+  .hint { position:fixed; left:32px; bottom:6px; max-width:calc(100vw - 330px); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-size:10px;
+    letter-spacing:.25em; color:#33414b; pointer-events:none; }
+  @media (max-width:760px) {
+    #panel { display:none; }
+    #alerts { left:50%; max-width:92vw; }
+    .hint { display:none; }
+    #heard { top:104px; max-width:86vw; }
+    header { padding:18px 20px; }
+    #log { left:16px; bottom:22px; width:calc(100vw - 32px); }
+    #log div:nth-last-child(n+6) { display:none; }
+  }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div class="sweep"></div>
+<div class="scan"></div>
+<div class="vig"></div>
+<div class="corner tl"></div><div class="corner tr"></div><div class="corner bl"></div><div class="corner br"></div>
+
+<header>
+  <div>
+    <div class="brand"><i></i>NEMESIS</div>
+    <div class="sub">NEURAL VOICE INTERFACE</div>
+  </div>
+  <div class="right"><b id="clock">--:--:--</b><span id="link" class="off">LINK: OFFLINE</span></div>
+</header>
+
+<div id="log"></div>
+<div id="alerts"></div>
+<div id="heard"></div>
+<div id="panel"></div>
+<div id="lightctl"><span id="lightstate">LIGHT</span><button type="button" data-say="turn on the lights">ON</button><button type="button" data-say="turn off the lights">OFF</button></div>
+<div id="phonebox"><div id="qr"></div>SCAN WITH PHONE<div id="purl"></div><small>CLICK THE QR TO ENLARGE<br>SECRET - HIDES IN 3 MIN</small></div>
+<button type="button" id="viewbtn">HIDE PANEL [H]</button>
+<div class="hint">F = FULLSCREEN &nbsp;·&nbsp; T = THEME &nbsp;·&nbsp; B = BACKGROUND &nbsp;·&nbsp; P = PHONE QR &nbsp;·&nbsp; H = HIDE / SHOW PANEL</div>
+
+<script>
+(function () {
+  "use strict";
+  const cv = document.getElementById("c");
+  const ctx = cv.getContext("2d");
+  let W = 0, H = 0;
+
+  function resize() {
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    W = window.innerWidth; H = window.innerHeight;
+    cv.width = W * dpr; cv.height = H * dpr;
+    cv.style.width = W + "px"; cv.style.height = H + "px";
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  window.addEventListener("resize", resize);
+  resize();
+
+  const STATES = {
+    sleeping:  { label: "STANDING BY", col: [200, 40, 40],  spin: 0.15, idle: 0.10, pulse: 1.0 },
+    listening: { label: "LISTENING",   col: [0, 205, 255],  spin: 0.40, idle: 0.14, pulse: 1.6 },
+    hearing:   { label: "HEARING YOU", col: [0, 255, 190],  spin: 0.90, idle: 0.20, pulse: 2.4 },
+    thinking:  { label: "PROCESSING",  col: [255, 170, 20], spin: 2.40, idle: 0.30, pulse: 4.0 },
+    speaking:  { label: "RESPONDING",  col: [255, 45, 45],  spin: 1.00, idle: 0.16, pulse: 2.0 }
+  };
+
+  let cur = "sleeping";
+  const col = STATES.sleeping.col.slice();
+  let target = 0, lvl = 0, lastLevelT = 0, rot = 0;
+  let lastTs = performance.now();
+
+  function rgb(a) { return Math.round(col[0]) + "," + Math.round(col[1]) + "," + Math.round(col[2]); }
+
+  function drawGrid(t, hz, cx) {
+    ctx.lineWidth = 1;
+    const base = rgb();
+    // horizontal lines moving toward the viewer
+    const n = 16;
+    for (let k = 0; k < n; k++) {
+      const p = ((k + (t * 0.35) % 1) / n);
+      const y = hz + (H - hz) * p * p;
+      ctx.strokeStyle = "rgba(" + base + "," + (0.05 + 0.22 * p) + ")";
+      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+    }
+    // vertical lines converging at the horizon
+    for (let i = -16; i <= 16; i++) {
+      ctx.strokeStyle = "rgba(" + base + ",0.13)";
+      ctx.beginPath();
+      ctx.moveTo(cx + i * 16, hz);
+      ctx.lineTo(cx + i * W * 0.11, H);
+      ctx.stroke();
+    }
+    // horizon line
+    const g = ctx.createLinearGradient(0, 0, W, 0);
+    g.addColorStop(0, "rgba(" + base + ",0)");
+    g.addColorStop(0.5, "rgba(" + base + ",0.55)");
+    g.addColorStop(1, "rgba(" + base + ",0)");
+    ctx.strokeStyle = g; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(0, hz); ctx.lineTo(W, hz); ctx.stroke();
+  }
+
+  function drawCore(t, cx, cy, R, e, S) {
+    const base = rgb();
+    // soft glow
+    let g = ctx.createRadialGradient(cx, cy, 0, cx, cy, R * 2.1);
+    g.addColorStop(0, "rgba(" + base + "," + (0.22 + 0.38 * e) + ")");
+    g.addColorStop(1, "rgba(" + base + ",0)");
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(cx, cy, R * 2.1, 0, Math.PI * 2); ctx.fill();
+
+    // radial bars driven by level
+    const N = 96;
+    ctx.lineCap = "round";
+    for (let i = 0; i < N; i++) {
+      const a = (i / N) * Math.PI * 2 + rot * 0.25;
+      const wob = Math.abs(Math.sin(i * 1.7 + t * 3.1) * Math.cos(i * 0.61 - t * 2.3));
+      const h = R * 0.07 + R * 0.5 * e * (0.25 + 0.75 * wob);
+      const r0 = R * 0.98;
+      ctx.strokeStyle = "rgba(" + base + "," + (0.35 + 0.65 * Math.min(1, e + 0.2)) + ")";
+      ctx.lineWidth = Math.max(1.5, R * 0.018);
+      ctx.beginPath();
+      ctx.moveTo(cx + Math.cos(a) * r0, cy + Math.sin(a) * r0);
+      ctx.lineTo(cx + Math.cos(a) * (r0 + h), cy + Math.sin(a) * (r0 + h));
+      ctx.stroke();
+    }
+
+    // rotating dashed rings
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = "rgba(" + base + ",0.75)";
+    ctx.setLineDash([R * 0.10, R * 0.06]);
+    ctx.lineDashOffset = -rot * 60;
+    ctx.beginPath(); ctx.arc(cx, cy, R * 0.88, 0, Math.PI * 2); ctx.stroke();
+    ctx.setLineDash([R * 0.03, R * 0.05]);
+    ctx.lineDashOffset = rot * 80;
+    ctx.strokeStyle = "rgba(" + base + ",0.45)";
+    ctx.beginPath(); ctx.arc(cx, cy, R * 0.74, 0, Math.PI * 2); ctx.stroke();
+    ctx.setLineDash([]);
+
+    // thick arc segments (spin faster while thinking)
+    ctx.lineWidth = Math.max(3, R * 0.05);
+    ctx.strokeStyle = "rgba(" + base + ",0.9)";
+    for (let k = 0; k < 3; k++) {
+      const a0 = rot * 1.4 + k * (Math.PI * 2 / 3);
+      ctx.beginPath(); ctx.arc(cx, cy, R * 0.62, a0, a0 + 0.55); ctx.stroke();
+    }
+
+    // reticle ticks
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = "rgba(" + base + ",0.8)";
+    for (let k = 0; k < 4; k++) {
+      const a = k * Math.PI / 2 + Math.PI / 4;
+      ctx.beginPath();
+      ctx.moveTo(cx + Math.cos(a) * R * 1.22, cy + Math.sin(a) * R * 1.22);
+      ctx.lineTo(cx + Math.cos(a) * R * 1.34, cy + Math.sin(a) * R * 1.34);
+      ctx.stroke();
+    }
+
+    // central eye
+    const er = R * (0.26 + 0.2 * e);
+    g = ctx.createRadialGradient(cx, cy, 0, cx, cy, er);
+    g.addColorStop(0, "rgba(255,255,255,0.95)");
+    g.addColorStop(0.35, "rgba(" + base + ",0.95)");
+    g.addColorStop(1, "rgba(" + base + ",0)");
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(cx, cy, er, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = "rgba(" + base + ",0.9)"; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(cx, cy, R * 0.34, 0, Math.PI * 2); ctx.stroke();
+  }
+
+  // ---------------------------------------------- speaking background
+  // style 0 = golden hologram sphere, 1 = your own picture (hud_bg.jpg next to nemesis.py), 2 = off
+  let bgStyle = 0, holo = 0, bgImg = null;
+  try { bgStyle = parseInt(localStorage.getItem("nemBg") || "0", 10) || 0; } catch (e) {}
+  (function () { const im = new Image(); im.onload = function () {
+      bgImg = im;
+      let chosen = null; try { chosen = localStorage.getItem("nemBg"); } catch (e) {}
+      if (chosen === null) bgStyle = 1;                 // you added hud_bg.jpg and never chose: show it
+    }; im.src = "/bg" + location.search; })();
+  const HP = [];
+  for (let i = 0; i < 520; i++) HP.push({ u: Math.random() * 2 - 1, a: Math.random() * 6.283, r: 0.5 + Math.random() * 0.5,
+                                         s: 0.15 + Math.random() * 0.7, k: 0.04 + Math.random() * 0.14 });
+
+  function drawHolo(t, cx, cy, size, amt, lv) {
+    const R = size * (1 + 0.10 * lv);
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+    const g = ctx.createRadialGradient(cx, cy, R * 0.1, cx, cy, R * 1.1);
+    g.addColorStop(0, "rgba(255,170,40," + (0.10 * amt) + ")"); g.addColorStop(1, "rgba(255,120,0,0)");
+    ctx.fillStyle = g; ctx.fillRect(cx - R * 1.2, cy - R * 1.2, R * 2.4, R * 2.4);
+    ctx.lineCap = "round";
+    const yaw = t * 0.25;
+    for (let i = 0; i < HP.length; i++) {
+      const p = HP[i], rad = Math.sqrt(1 - p.u * p.u);
+      const th = p.a + t * p.s * 0.6;
+      const pt = function (ang) {
+        const x = rad * Math.cos(ang) * p.r, z = rad * Math.sin(ang) * p.r, y = p.u * p.r;
+        const xr = x * Math.cos(yaw) - z * Math.sin(yaw), zr = x * Math.sin(yaw) + z * Math.cos(yaw);
+        return [cx + xr * R, cy + y * R, zr];
+      };
+      const a = pt(th), b = pt(th - p.k);
+      const depth = 0.25 + 0.75 * (a[2] + 1) / 2;
+      ctx.strokeStyle = "rgba(255," + (150 + Math.round(90 * depth)) + ",50," + (amt * depth * 0.85) + ")";
+      ctx.lineWidth = 0.8 + depth * 1.6;
+      ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke();
+    }
+    for (let k = 0; k < 5; k++) {      // tilted orbit rings
+      ctx.save(); ctx.translate(cx, cy); ctx.rotate(t * (0.12 + k * 0.05) * (k % 2 ? -1 : 1) + k);
+      ctx.strokeStyle = "rgba(255,190,70," + (amt * (0.35 - k * 0.04)) + ")"; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.ellipse(0, 0, R * (0.55 + k * 0.1), R * (0.18 + 0.1 * Math.abs(Math.sin(t * 0.3 + k))), 0, 0, 6.283); ctx.stroke();
+      ctx.restore();
+    }
+    ctx.restore();
+  }
+
+  function frame(ts) {
+    const dt = Math.min(0.1, (ts - lastTs) / 1000);
+    lastTs = ts;
+    const t = ts / 1000;
+    const S = STATES[cur];
+
+    if (ts - lastLevelT > 300) target *= 0.9;
+    lvl += (target - lvl) * 0.30;
+    for (let i = 0; i < 3; i++) col[i] += (S.col[i] - col[i]) * 0.08;
+    rot += S.spin * dt;
+
+    const breath = 0.5 + 0.5 * Math.sin(t * S.pulse);
+    const e = Math.min(1, Math.max(lvl, S.idle * breath));
+
+    ctx.fillStyle = "#05070a";
+    ctx.fillRect(0, 0, W, H);
+    document.documentElement.style.setProperty("--c", rgb());
+    const picAlways = bgStyle === 1 && bgImg;           // your own picture stays on screen all the time
+    holo += ((picAlways || (cur === "speaking" && bgStyle < 2) ? 1 : 0) - holo) * 0.05;
+    if (holo > 0.01) {
+      if (bgStyle === 1 && bgImg) {
+        ctx.globalAlpha = (cur === "speaking" ? 0.95 : 0.7) * holo;
+        const sc = Math.max(W / bgImg.width, H / bgImg.height);
+        ctx.drawImage(bgImg, (W - bgImg.width * sc) / 2, (H - bgImg.height * sc) / 2, bgImg.width * sc, bgImg.height * sc);
+        ctx.globalAlpha = 1;
+      } else {
+        drawHolo(ts / 1000, W / 2, H * 0.42, Math.min(W, H) * 0.42, holo, lvl);
+      }
+    }
+
+    const cx = W / 2;
+    const cy = H * 0.40;
+    const R = Math.min(W * 0.26, H * 0.2);
+    const hz = H * 0.62;
+
+    drawGrid(t, hz, cx);
+    drawCore(t, cx, cy, R, e, S);
+
+    // status text
+    ctx.textAlign = "center";
+    ctx.fillStyle = "rgba(" + rgb() + ",0.95)";
+    ctx.font = "700 " + Math.max(14, Math.round(R * 0.15)) + "px Consolas, monospace";
+    ctx.fillText(S.label.split("").join(" "), cx, cy + R * 1.62);
+    ctx.font = Math.max(10, Math.round(R * 0.075)) + "px Consolas, monospace";
+    ctx.fillStyle = "rgba(180,200,212,0.55)";
+    ctx.fillText("SIGNAL " + (e * 100).toFixed(0).padStart(3, "0") + "%", cx, cy + R * 1.82);
+
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+
+  // ---------------------------------------------------------------- UI bits
+  const logEl = document.getElementById("log");
+  const panelEl = document.getElementById("panel");
+  const alertsEl = document.getElementById("alerts");
+  const heardEl = document.getElementById("heard");
+  const linkEl = document.getElementById("link");
+
+  function addLog(who, text) {
+    const d = document.createElement("div");
+    d.className = who;
+    const tag = document.createElement("span");
+    tag.textContent = who === "you" ? "YOU" : who === "nemesis" ? "NEMESIS" : "SYS";
+    d.appendChild(tag);
+    d.appendChild(document.createTextNode(text));
+    logEl.appendChild(d);
+    while (logEl.children.length > 8) logEl.removeChild(logEl.firstChild);
+  }
+
+  // ---- phone link: the secret key is never shown as text; the QR is hidden unless needed
+  let linkUrl = "", boxTimer = null, phoneUp = false;
+  function maskUrl(u) { return u.replace(/key=[^&]+/, "key=\u2022\u2022\u2022\u2022\u2022\u2022"); }
+  document.getElementById("qr").addEventListener("click", function () { this.classList.toggle("big"); });
+  function drawQR() {
+    const qr = document.getElementById("qr");
+    qr.textContent = "";
+    qr.style.display = "block";
+    const img = new Image();
+    img.alt = "QR code";
+    img.style.background = "#fff";
+    img.onerror = function () {
+      qr.style.display = "none";
+      document.getElementById("purl").textContent = "QR failed. Copy the link from the Nemesis terminal window.";
+    };
+    img.src = "/qr.svg?t=" + Date.now();                      // drawn by Nemesis itself, works offline
+    qr.appendChild(img);
+  }
+  function showBox(on) {
+    const box = document.getElementById("phonebox");
+    clearTimeout(boxTimer);
+    if (!on || !linkUrl) { box.style.display = "none"; document.getElementById("qr").textContent = ""; return; }
+    document.getElementById("purl").textContent = maskUrl(linkUrl);
+    drawQR();
+    box.style.display = "block";
+    boxTimer = setTimeout(function () { showBox(false); }, 180000);
+  }
+  function setLinkUrl(u) {
+    if (!u || u === linkUrl) return;
+    linkUrl = u;
+    if (!phoneUp) showBox(true);          // nobody connected yet: show the QR so you can scan it
+  }
+
+  // ---- side panel
+  function level(v) { const n = parseInt(v, 10); return isNaN(n) ? 0 : n; }
+  function cls(c) { return c ? " " + c : ""; }
+  function row(label, value, c) {
+    const d = document.createElement("div"); d.className = "row2";
+    d.appendChild(document.createTextNode(label));
+    const b = document.createElement("b"); b.className = c || ""; b.textContent = String(value).toUpperCase();
+    d.appendChild(b); return d;
+  }
+  function bar(label, v) {
+    const n = Math.max(0, Math.min(100, level(v)));
+    const wrap = document.createElement("div");
+    wrap.appendChild(row(label, n + "%", n >= 90 ? "bad" : n >= 75 ? "warn" : ""));
+    const bd = document.createElement("div"); bd.className = "bar";
+    const i = document.createElement("i"); i.style.width = n + "%"; i.className = n >= 90 ? "bad" : n >= 75 ? "warn" : "";
+    bd.appendChild(i); wrap.appendChild(bd); return wrap;
+  }
+  function group(title, nodes) {
+    const g = document.createElement("div"); g.className = "grp";
+    const t = document.createElement("h4"); t.textContent = title; g.appendChild(t);
+    nodes.forEach(function (n) { if (n) g.appendChild(n); });
+    return g;
+  }
+  function chip(text, c) { const s = document.createElement("span"); s.className = "chip " + c; s.textContent = text; return s; }
+
+  const lightCtl = document.getElementById("lightctl"), lightState = document.getElementById("lightstate");
+  lightCtl.addEventListener("click", function (e) {
+    const b = e.target.closest("button[data-say]"); if (!b) return;
+    fetch("/utter", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text: b.getAttribute("data-say"), direct: true }) }).catch(function () {});
+  });
+  function setInfo(m) {
+    lightState.textContent = "LIGHT: " + (m.light || "-"); lightCtl.classList.toggle("on", m.light === "ON");
+    phoneUp = m.phone === "connected";
+    if (phoneUp && document.getElementById("phonebox").style.display === "block") showBox(false);
+    const has = function (label, v, c) { return v ? row(label, v, c) : null; };
+    panelEl.textContent = "";
+    panelEl.appendChild(group("SYSTEM", [
+      m.cpu ? bar("CPU", m.cpu) : null, m.ram ? bar("MEMORY", m.ram) : null, has("WEATHER", m.weather)]));
+    panelEl.appendChild(group("BRAIN", [
+      has("MODEL", m.model), has("VOICE", m.voice), has("EARS", m.stt), has("OUTPUT", m.speaker), has("NETWORK", m.net, m.net === "OFFLINE" ? "warn" : ""),
+      has("LAST REPLY", m.speed && m.speed !== "-" ? m.speed : "", ""), has("NEXT", m.next && m.next !== "NONE" ? m.next : "")]));
+    panelEl.appendChild(group("SENSES", [
+      has("CAMERA", m.camera, m.camera === "ON" ? "warn" : ""), m.camera === "ON" ? has("SEES", m.sees || "nothing") : null,
+      has("PHONE", m.phone, phoneUp ? "ok" : ""), has("LIGHT", m.light, m.light === "ON" ? "warn" : m.light === "OFF" ? "ok" : "")]));
+    panelEl.appendChild(group("SECURITY", [
+      has("LINK", m.link, m.link === "encrypted" ? "ok" : "bad"), has("PRIVACY", m.privacy, m.privacy === "ON" ? "warn" : ""),
+      has("PIN", m.pin, m.pin === "SET" ? "ok" : "warn"), has("SESSIONS", m.sessions),
+      has("FILES", m.files, m.files === "OK" ? "ok" : "bad"), has("PC CHECK", m.pccheck, m.pccheck === "CLEAN" ? "ok" : "bad")]));
+    alertsEl.textContent = "";
+    if (level(m.ram) >= 88) alertsEl.appendChild(chip("LOW MEMORY - CLOSE APPS", "bad"));
+    if (m.link === "plain") alertsEl.appendChild(chip("UNENCRYPTED LINK", "bad"));
+    if (m.frozen === "YES") alertsEl.appendChild(chip("FROZEN - SAY UNFREEZE NEMESIS", "bad"));
+    if (m.lowram === "YES") alertsEl.appendChild(chip("LOW MEMORY - CAMERA PAUSED", "warn"));
+    if (m.privacy === "ON") alertsEl.appendChild(chip("PRIVACY MODE", "warn"));
+    if (m.camera === "ON") alertsEl.appendChild(chip("CAMERA ON", "warn"));
+    if (m.net === "OFFLINE") alertsEl.appendChild(chip("OFFLINE MODE", "warn"));
+    if (m.files === "CHANGED") alertsEl.appendChild(chip("FILES CHANGED - CHECK", "bad"));
+    if (m.pccheck && m.pccheck !== "CLEAN") alertsEl.appendChild(chip("PC CHECK: " + m.pccheck, "bad"));
+    if (m.mode) alertsEl.appendChild(chip(m.mode, "ok"));
+  }
+
+  let heardTimer = null;
+  function showHeard(text) {
+    heardEl.textContent = "\u201C" + text + "\u201D";
+    heardEl.classList.add("on");
+    clearTimeout(heardTimer);
+    heardTimer = setTimeout(function () { heardEl.classList.remove("on"); }, 7000);
+  }
+
+  function handle(m) {
+    if (m.t === "state") { if (STATES[m.v]) cur = m.v; }
+    else if (m.t === "level") { target = Math.min(1, Math.max(0, m.v)); lastLevelT = performance.now(); }
+    else if (m.t === "log") { addLog(m.who, m.text); if (m.who === "you") showHeard(m.text); }
+    else if (m.t === "link") setLinkUrl(m.url);
+    else if (m.t === "showlink") showBox(true);
+    else if (m.t === "hidelink") showBox(false);
+    else if (m.t === "info") setInfo(m);
+    else if (m.t === "bg") cycleBg();
+  }
+
+  function setLink(on) {
+    linkEl.textContent = on ? "LINK: ONLINE" : "LINK: OFFLINE";
+    linkEl.className = on ? "on" : "off";
+  }
+
+  function tickClock() {
+    const d = new Date();
+    document.getElementById("clock").textContent =
+      [d.getHours(), d.getMinutes(), d.getSeconds()].map(function (n) { return String(n).padStart(2, "0"); }).join(":");
+  }
+  setInterval(tickClock, 1000); tickClock();
+
+  let hue = 0;
+  try { hue = parseInt(localStorage.getItem("nemHue") || "0", 10) || 0; } catch (e) {}
+  function cycleBg() { bgStyle = (bgStyle + 1) % 3; try { localStorage.setItem("nemBg", String(bgStyle)); } catch (e) {} }
+  function applyHue() { document.documentElement.style.filter = hue ? "hue-rotate(" + hue + "deg)" : ""; }
+  applyHue();
+  // view 0 = everything, 1 = no side panel, 2 = clean (orb and clock only; good for screen recordings)
+  let view = 0;
+  const viewBtn = document.getElementById("viewbtn");
+  function setView(v) {
+    view = v;
+    document.body.classList.remove("view1", "view2");
+    if (v) document.body.classList.add("view" + v);
+    viewBtn.textContent = ["HIDE PANEL [H]", "CLEAN VIEW [H]", "SHOW ALL [H]"][v];
+    try { localStorage.setItem("nemView", String(v)); } catch (err) {}
+  }
+  try { setView(parseInt(localStorage.getItem("nemView") || "0", 10) % 3 || 0); } catch (err) { setView(0); }
+  viewBtn.addEventListener("click", function () { setView((view + 1) % 3); });
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "h" || e.key === "H") setView((view + 1) % 3);
+    if (e.key === "b" || e.key === "B") cycleBg();
+    if (e.key === "p" || e.key === "P") showBox(document.getElementById("phonebox").style.display !== "block");
+    if (e.key === "t" || e.key === "T") {
+      hue = (hue + 60) % 360; applyHue();
+      try { localStorage.setItem("nemHue", String(hue)); } catch (err) {}
+    }
+    if (e.key === "f" || e.key === "F") {
+      if (document.fullscreenElement) document.exitFullscreen();
+      else document.documentElement.requestFullscreen();
+    }
+  });
+  document.addEventListener("dblclick", function () {
+    if (document.fullscreenElement) document.exitFullscreen();
+    else document.documentElement.requestFullscreen();
+  });
+
+  // ---------------------------------------------------------- live / demo
+  if (location.search.indexOf("demo") !== -1) {
+    // Preview mode: open hud.html?demo (works without Nemesis running)
+    setLink(true);
+    setInfo({ model: "llama3.2:3b", voice: "en-US-GuyNeural", stt: "phone browser", mic: "phone microphone", speaker: "demo output", phone: "connected", cpu: "34%", ram: "72%", speed: "2.1s", next: "17:30 take medicine", camera: "OFF", privacy: "OFF", link: "encrypted", pin: "SET", sessions: "1", net: "ONLINE", files: "OK", pccheck: "CLEAN" });
+    setLinkUrl("https://192.168.1.5:8766/phone?key=demodemodemo");
+    addLog("sys", "Demo mode - this is a preview, not live data.");
+    const script = [
+      ["sleeping", 4000], ["hearing", 2500, "you", "Nemesis, what time is it?"],
+      ["thinking", 1500], ["speaking", 3500, "nemesis", "It's nine forty. All systems nominal."],
+      ["listening", 3000], ["sleeping", 3000]
+    ];
+    let idx = 0;
+    (function step() {
+      const s = script[idx % script.length]; idx++;
+      cur = s[0];
+      if (s[2]) addLog(s[2], s[3]);
+      const until = performance.now() + s[1];
+      (function tick() {
+        if (performance.now() < until) {
+          if (cur === "hearing" || cur === "speaking" || cur === "listening") {
+            target = 0.25 + Math.random() * 0.7; lastLevelT = performance.now();
+          }
+          setTimeout(tick, 60);
+        } else step();
+      })();
+    })();
+  } else {
+    const es = new EventSource("/events");
+    es.onopen = function () { setLink(true); };
+    es.onerror = function () { setLink(false); };
+    es.onmessage = function (e) { try { handle(JSON.parse(e.data)); } catch (err) {} };
+  }
+})();
+</script>
+</body>
+</html>
