@@ -57,3 +57,16 @@ Personal project, built step by step on low-end hardware. Feedback and ideas are
 
 ## Licence
 MIT. See `LICENSE`.
+
+## Run without a phone (PC only)
+Nemesis can run on the PC alone, with no phone and no USB tethering. Any normal internet connection (Wi-Fi or cable) works.
+
+```
+python nemesis.py --pc-mic --cam
+```
+- `--pc-mic` listens through a PC microphone (a headset, earbuds or a USB mic). Add `--setup` once to choose the mic and speaker.
+- `--cam` uses a PC webcam as the eyes (object detection, face recognition, reading text). It needs a webcam plugged into the PC. A basic USB webcam with a built-in mic is enough.
+- Without a webcam, voice still works. For camera features, use the phone camera instead.
+
+
+
