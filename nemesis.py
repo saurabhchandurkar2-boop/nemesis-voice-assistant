@@ -13,6 +13,7 @@ Flags:  --pc-mic  use the PC microphone instead (needs a working mic)
         --http    use the old unencrypted phone link (not recommended)
         --check   run the health check and exit
         --cam     also use a PC webcam as eyes (the phone camera works without it)
+        --pc-voice  with the phone mic, ALSO speak replies on the PC speaker (for recording or headphones)
 """
 import asyncio
 import concurrent.futures
@@ -87,6 +88,7 @@ PHONE_AWAKE_SECONDS = 30           # hands-free: stays awake this long after a r
 
 LOCAL_MIC = "--pc-mic" in sys.argv
 HUD_OPEN_BROWSER = "--no-hud" not in sys.argv
+PHONE_REPLY_TARGET = "both" if "--pc-voice" in sys.argv else "phone"   # where replies go when the phone is the mic
 HUD_PORT = 8765
 
 for _stream in (sys.stdout, sys.stderr):      # Hindi text must never crash a print()
@@ -1740,7 +1742,9 @@ def verify_audit():
 
 def on_new_device(ip, ua):
     """A phone just logged in: tell the PC screen and say so out loud."""
-    hub.log("sys", f"New phone connected from {ip}")
+    parts = str(ip).split(".")
+    shown_ip = ".".join(parts[:2] + ["x", "x"]) if len(parts) == 4 else "a new device"   # hide the full address on screen
+    hub.log("sys", f"New phone connected from {shown_ip}")
     audit("secure", f"new phone from {ip}")
     say("A new phone has connected.", target="pc")
 
@@ -3043,7 +3047,7 @@ def phone_loop():
             print(f"You (phone): {shown}")
             hub.log("you", shown)
             audit("phone", text)
-            REPLY_TARGET = "phone"
+            REPLY_TARGET = PHONE_REPLY_TARGET
             if not process(text, direct=item["direct"], window=PHONE_AWAKE_SECONDS, lang=item.get("lang")):
                 break
         except KeyboardInterrupt:
