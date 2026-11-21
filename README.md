@@ -1,4 +1,4 @@
-﻿# NEMESIS - Neural Voice Interface
+# NEMESIS - Neural Voice Interface
 
 A free, local, Jarvis-style voice assistant for Windows with an Android phone as the microphone.
 It listens, thinks with a local language model (Ollama), answers in a deep robotic voice, and shows
@@ -16,7 +16,7 @@ a futuristic HUD in the browser. No paid services. Built to run on an old PC wit
 - HUD with a hide-panel button and a clean view for screen recordings
 
 ## Design principles
-- **Local first.** Speech recognition and the language model run on your own machine.
+- **Local first.** The language model, face recognition and offline speech run on your own machine. Nothing is sent to a paid service.
 - **Safety by design.** A permission gate rates every action (read, reversible, sensitive, admin) and asks for
   confirmation or a PIN before anything sensitive. A voice "freeze" stops speech, camera and pending actions at once.
 - **Reliable updates.** `python nemesis.py --selftest` runs a command test before every update, and the updater
@@ -28,6 +28,13 @@ a futuristic HUD in the browser. No paid services. Built to run on an old PC wit
 - [Ollama](https://ollama.com) with a small model, for example `ollama pull llama3.2:3b`
 - An Android phone with Chrome on the same Wi-Fi (or USB tethering) as the PC
 - Optional: Tesseract OCR for reading text from the camera
+
+## What needs internet
+- **Setup:** pip packages and the model downloads (Ollama model, Whisper and face models) need internet once. Run `python nemesis.py --get-offline` while online to fetch the offline speech models.
+- **Phone voice:** the phone uses Chrome's speech recognition, which usually needs internet. For voice without internet, use `--pc-mic` with offline mode.
+- **Default voice:** the deep voice uses an online service. Offline mode switches to Windows voices.
+- **Online skills:** weather, news, Wikipedia and YouTube.
+- **Works offline after setup:** the AI brain, face recognition, camera text reading, notes, tasks, maths and the safety gate.
 
 ## Install
 ```
@@ -44,6 +51,16 @@ Open the HUD at `http://127.0.0.1:8765` on the PC.
 Keys: `F` fullscreen, `T` theme colour, `B` background, `P` phone QR, `H` hide or show the side panel.
 To use your own HUD background, save a 1920x1080 picture as `hud_bg.jpg` next to `nemesis.py`.
 
+## Run without a phone (PC only)
+Nemesis can run on the PC alone, with no phone and no USB tethering. Any normal internet connection (Wi-Fi or cable) works.
+
+```
+python nemesis.py --pc-mic --cam
+```
+- `--pc-mic` listens through a PC microphone (a headset, earbuds or a USB mic). Add `--setup` once to choose the mic and speaker.
+- `--cam` uses a PC webcam as the eyes (object detection, face recognition, reading text). It needs a webcam plugged into the PC. A basic USB webcam with a built-in mic is enough.
+- Without a webcam, voice still works. For camera features, use the phone camera instead.
+
 ## Light control (optional hardware)
 Upload `nemesis_light.ino` to an Arduino Uno. Wire a 5 V relay module: VCC to 5V, GND to GND, IN to pin 7.
 Switch only the **12 V side** of an LED strip through the relay's COM and NO terminals. Never open or modify mains
@@ -57,16 +74,3 @@ Personal project, built step by step on low-end hardware. Feedback and ideas are
 
 ## Licence
 MIT. See `LICENSE`.
-
-## Run without a phone (PC only)
-Nemesis can run on the PC alone, with no phone and no USB tethering. Any normal internet connection (Wi-Fi or cable) works.
-
-```
-python nemesis.py --pc-mic --cam
-```
-- `--pc-mic` listens through a PC microphone (a headset, earbuds or a USB mic). Add `--setup` once to choose the mic and speaker.
-- `--cam` uses a PC webcam as the eyes (object detection, face recognition, reading text). It needs a webcam plugged into the PC. A basic USB webcam with a built-in mic is enough.
-- Without a webcam, voice still works. For camera features, use the phone camera instead.
-
-
-
